@@ -33,7 +33,6 @@ export const getHdeaderData = (
     if (horCellsNumber > remainingColumns) {
       horCellsNumber = remainingColumns;
     }
-    console.log(horCellsNumber);
 
     for (let i = vertCellsNumber - 1; i >= 0; i--) {
       if (i === vertCellsNumber - 1) {
@@ -46,7 +45,6 @@ export const getHdeaderData = (
       } else {
       }
       remainingColumns -= vertCellsNumber;
-      console.log(remainingColumns);
     }
     return headerData;
   }
@@ -118,7 +116,7 @@ export const getHeaderData = (colNum: number) => {
         bottomCellsNumber++;
         return {
           ...cell,
-          touchHeaderBottom: true,
+          bottomCellIndex: bottomCellsNumber - 1,
           id: uuid()
         };
       }
@@ -131,3 +129,27 @@ export const getHeaderData = (colNum: number) => {
     bottomCellsNumber,
   };
 };
+
+//used for callback argument in memoized components, like: React.memo(() => (<></>), (a, b) => compareExcept(a, b, someProp, anotherProp, ...etc))
+export const compareExcept = (a: any, b: any, ...exceptions: string[]) => {
+  let doesNotUpdateComponent = true;
+  const componentProps = Object.keys(a);
+
+  let index = 0;
+  while (index < componentProps.length && doesNotUpdateComponent) {
+    const propertyName = componentProps[index];
+    if (a[propertyName] !== b[propertyName] 
+      && !exceptions.includes(propertyName)) {
+      doesNotUpdateComponent = false;
+    }
+    index+=1;
+  }
+
+  return doesNotUpdateComponent;
+}
+
+export const isValid = (x: number | null | undefined) => x !== null
+&& x !== undefined
+&& !Number.isNaN(x)
+&& x !== Infinity
+&& x !== -Infinity;

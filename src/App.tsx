@@ -12,16 +12,24 @@ import {
   useMemo,
   useState,
   useRef,
-  MutableRefObject,
-  UIEvent,
   useCallback,
-  memo
+  memo,
+  MouseEvent,
+  useEffect
 } from "react";
 import { useVirtual } from "react-virtual";
 import { makeStyles } from "@mui/styles";
+import CustomRow from "./components/row";
+import ResizingLine from "./components/resizingLine";
+import { margin } from "@mui/system";
 
 const cellWidth = 130;
+const minCellWidth = 50;
+const maxCellWidth = 600;
+
 const cellHeight = 32;
+
+const paperPadding = 16;
 
 const useStyles = makeStyles({
   app: {
@@ -33,8 +41,9 @@ const useStyles = makeStyles({
   },
   paper: {
     boxSizing: 'border-box',
+    position: 'relative',
     height: '90%',
-    padding: 16,
+    padding: paperPadding,
   },
   tableContainer: {
     width: 'fit-content !important',
@@ -68,20 +77,15 @@ const useStyles = makeStyles({
     borderStyle: "solid",
     zIndex: 1,
   },
-  bodyCell: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    height: "100%",
-    boxSizing: "border-box",
-    borderWidth: '1px 0 0 1px',
-    borderColor: 'black',
-    borderStyle: "solid",
-  },
   cell: {
     border: "1px solid black !important",
     padding: '2px 0 !important',
     background: 'white !important',
+  },
+  resizingLine: {
+    boxSizing: "border-box",
+    height: `calc(100% - ${paperPadding * 2}px) !important`,
+    marginTop: paperPadding,
   }
 });
 
@@ -89,12 +93,16 @@ type MaybeDiv = HTMLDivElement | null;
 
 interface CustomCellProps {
   cell: UnicHeaderCell;
+  cellWidth?: number;
 }
 
-const CustomCell = (props: CustomCellProps) => {
-  const { cell } = props;
+const CustomCell = memo((props: CustomCellProps) => {
+  const { cell, cellWidth } = props;
+
+  const width = useMemo(() => (!cellWidth || Number.isNaN(cellWidth)) ? "auto" : cellWidth - 1, [cellWidth])
 
   const classes = useStyles();
+
   return (
     <TableCell
       className={classes.cell}
@@ -103,7 +111,7 @@ const CustomCell = (props: CustomCellProps) => {
     >
       <div
         style={{
-          width: cell.touchHeaderBottom ? cellWidth : "auto",
+          width,
           textAlign: "center"
         }}
       >
@@ -111,14 +119,15 @@ const CustomCell = (props: CustomCellProps) => {
       </div>
     </TableCell>
   );
-};
+});
 
 interface TableHeaderProps {
   headerData: UnicHeaderCell[][];
+  cellsWidth: number[];
 }
 
 const TableHeader = memo((props: TableHeaderProps) => {
-  const { headerData } = props;
+  const { headerData, cellsWidth } = props;
 
   const classes = useStyles();
 
@@ -131,7 +140,10 @@ const TableHeader = memo((props: TableHeaderProps) => {
           {headerData.map((row, rowIndex) => (
             <TableRow key={`${rowIndex}`}>
               {row.map((cell) => (
-                <CustomCell cell={cell} key={cell.id} />
+                <CustomCell
+                  cell={cell}
+                  key={cell.id}
+                  cellWidth={(cell.bottomCellIndex || cell.bottomCellIndex === 0) ? cellsWidth[cell.bottomCellIndex] : undefined} />
               ))}
             </TableRow>
           ))}
@@ -146,7 +158,15 @@ export default function App() {
     () => getHeaderData(60),
     []
   );
-  const headerRef = useRef<MaybeDiv>(null);
+  const [isDrag, setIsDrag] = useState(false);
+  const [savedXCoord, setSavedXCoord] = useState<number>();
+  const [savedWidth, setSavedWidth] = useState(cellWidth);
+  const [resizeColumnIndex, setResizeColumnIndex] = useState(0);
+  const [showResizingLine, setShowResizingLine] = useState(false);
+  const [resizingLinePosition, setResizingLinePosition] = useState(0);
+
+  // console.log('isDrag = %s, resizeColumnIndex = %d, savedXCoord = %d', isDrag, resizeColumnIndex, savedXCoord);
+
   const bodyRef = useRef<MaybeDiv>(null);
   const containerRef = useRef<MaybeDiv>(null);
 
@@ -155,6 +175,59 @@ export default function App() {
   const [cellsWidth, setCellsWidth] = useState(
     Array.from({ length: bottomCellsNumber }, () => cellWidth + 1)
   );
+
+  const setResizingLineToCurPosition = (e: MouseEvent) => setResizingLinePosition(e.clientX - e.currentTarget.getBoundingClientRect().x);
+
+  const handleDrag = (e: MouseEvent, isDrag: boolean, xCoord: number) => {
+    setIsDrag(isDrag);
+    setSavedXCoord(xCoord);
+  };
+
+  const handleColumnIndex = (index: number) => {
+    setResizeColumnIndex(index)
+    setSavedWidth(cellsWidth[index])
+  };
+
+  const handleColumnWidthChange = (width: number, index: number) => {
+    setCellsWidth(arr => {
+      const resultArray = arr.slice();
+      resultArray[index] = width;
+      return resultArray;
+    })
+  }
+
+  const onMouseMove = (e: MouseEvent) => {
+    if (isDrag && savedXCoord && savedXCoord !== e.clientX) {
+      !showResizingLine && setShowResizingLine(true)
+      let calculatedWidth = savedWidth + e.screenX - savedXCoord;
+      if (calculatedWidth > maxCellWidth || calculatedWidth < minCellWidth) {
+        return;
+      }
+      setResizingLineToCurPosition(e)
+    }
+  };
+
+  const onMouseLeave = () => {
+    setIsDrag(false);
+    setShowResizingLine(false)
+  }
+
+  const disableDrag = (e: MouseEvent) => {
+    setShowResizingLine(false)
+    setIsDrag(false);
+    if (savedXCoord && isDrag) {
+      let calculatedWidth = savedWidth + e.screenX - savedXCoord;
+      if (calculatedWidth < minCellWidth) {
+        calculatedWidth = minCellWidth;
+      }
+      if (calculatedWidth > maxCellWidth) {
+        calculatedWidth = maxCellWidth;
+      }
+      handleColumnWidthChange(calculatedWidth, resizeColumnIndex)
+    }
+  }
+
+  useEffect(() => { console.log(isDrag) }, [isDrag])
 
   const columnVirtualizer = useVirtual({
     horizontal: true,
@@ -177,42 +250,33 @@ export default function App() {
         <div
           ref={containerRef}
           className={classes.container}
+          onMouseMove={onMouseMove}
+          onMouseUp={disableDrag}
+          onMouseLeave={onMouseLeave}
+          style={{ userSelect: isDrag ? 'none' : 'auto', }}
         >
           <TableHeader
             headerData={headerData}
+            cellsWidth={cellsWidth}
           />
           <div
             className={classes.bodyContainer}
-            ref={bodyRef}
             style={{ height: rowVirtualizer.totalSize, width: columnVirtualizer.totalSize }}
           >
-            {rowVirtualizer.virtualItems.map((virtualRow, i,) => (
-              <div
-                key={`${virtualRow.index}`}
-                style={{
-                  position: "absolute",
-                  width: `${columnVirtualizer.totalSize}px`,
-                  height: cellHeight,
-                  transform: `translateY(${virtualRow.start}px)`
-                }}
-              >
-                {columnVirtualizer.virtualItems.map((virtualColumn, i) => (
-                  <div
-                    key={virtualColumn.index}
-                    ref={virtualColumn.measureRef}
-                    className={classes.bodyCell}
-                    style={{
-                      minWidth: cellsWidth[i],
-                      transform: `translateX(${virtualColumn.start}px)`
-                    }}
-                  >
-                    {`${virtualRow.index} ${virtualColumn.index}`}
-                  </div>
-                ))}
-              </div>
+            {rowVirtualizer.virtualItems.map((virtualRow, i) => (
+              <CustomRow
+                key={virtualRow.index}
+                virtualRow={virtualRow}
+                columnVirtualizer={columnVirtualizer}
+                cellsWidth={cellsWidth}
+                cellHeight={cellHeight}
+                handleDrag={handleDrag}
+                handleColumnIndex={handleColumnIndex}
+              />
             ))}
           </div>
         </div>
+        <ResizingLine show={showResizingLine} position={resizingLinePosition} injectedStyle={classes.resizingLine} />
       </Paper>
     </div>
   );
