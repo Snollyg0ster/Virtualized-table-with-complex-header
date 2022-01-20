@@ -1,12 +1,19 @@
 import { makeStyles } from "@mui/styles";
-import { memo, MouseEvent, useState } from "react";
+import { memo, MouseEvent, useMemo, } from "react";
 import { VirtualItem } from "react-virtual";
 import { ColumnVirtualizer } from "../../models";
 import { compareExcept } from "../../utils";
 import BodyCell from "../cell";
 
-const useStyles = makeStyles({
+const dragAreaHeight = 4;
 
+const useStyles = makeStyles({
+  resize: {
+    position: "relative",
+    height: dragAreaHeight,
+    cursor: 'row-resize',
+    zIndex: 2,
+  },
 });
 
 interface CustomRowProps {
@@ -16,10 +23,18 @@ interface CustomRowProps {
   cellHeight: number;
   handleColumnIndex: (index: number) => void;
   handleDrag: (e: MouseEvent, isDrag: boolean, xCoord: number) => void;
+  handleRowIndex: (index: number) => void;
+  handleRowDrag: (e: MouseEvent, isRowDrag: boolean, YCoord: number) => void;
 }
 
 const CustomRow = memo((props: CustomRowProps) => {
-  const { virtualRow, cellsWidth, columnVirtualizer, cellHeight, handleColumnIndex, handleDrag } = props;
+  const { virtualRow, cellsWidth, columnVirtualizer, handleColumnIndex,
+    handleDrag, cellHeight, handleRowIndex, handleRowDrag } = props;
+
+  const onMouseDown = (e: MouseEvent, index: number) => {
+    handleRowDrag(e, true, e.screenY);
+    handleRowIndex(index)
+  };
 
   const classes = useStyles();
 
@@ -33,7 +48,8 @@ const CustomRow = memo((props: CustomRowProps) => {
         transform: `translateY(${virtualRow.start}px)`
       }}
     >
-      {columnVirtualizer.virtualItems.map((virtualColumn) => (
+      <div className={classes.resize} onMouseDown={(e) => onMouseDown(e, virtualRow.index - 1)} />
+      <div style={{ zIndex: 0 }}>{columnVirtualizer.virtualItems.map((virtualColumn) => (
         <BodyCell
           key={virtualColumn.index}
           rowIndex={virtualRow.index}
@@ -42,9 +58,14 @@ const CustomRow = memo((props: CustomRowProps) => {
           handleDrag={handleDrag}
           handleColumnIndex={handleColumnIndex}
         />
-      ))}
+      ))}</div>
+      <div
+        style={{ marginTop: cellHeight - dragAreaHeight * 2 }}
+        className={classes.resize}
+        onMouseDown={(e) => onMouseDown(e, virtualRow.index)} />
     </div>
   )
-}, (a, b) => compareExcept(a, b, 'handleDrag', 'handleColumnIndex'));
+}, (a, b) => compareExcept(a, b, 'handleDrag', 'handleColumnIndex',
+  'handleRowDrag', 'handleRowIndex'));
 
 export default CustomRow;

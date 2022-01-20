@@ -21,13 +21,14 @@ import { useVirtual } from "react-virtual";
 import { makeStyles } from "@mui/styles";
 import CustomRow from "./components/row";
 import ResizingLine from "./components/resizingLine";
-import { margin } from "@mui/system";
 
 const cellWidth = 130;
 const minCellWidth = 50;
 const maxCellWidth = 600;
 
 const cellHeight = 32;
+const minCellHeight = 50;
+const maxCellHeight = 400;
 
 const paperPadding = 16;
 
@@ -85,6 +86,11 @@ const useStyles = makeStyles({
   resizingLine: {
     boxSizing: "border-box",
     height: `calc(100% - ${paperPadding * 2}px) !important`,
+    marginTop: paperPadding,
+  },
+  resizingRowLine: {
+    boxSizing: "border-box",
+    width: `calc(100% - ${paperPadding * 2}px) !important`,
     marginTop: paperPadding,
   }
 });
@@ -159,42 +165,66 @@ export default function App() {
     []
   );
   const [isDrag, setIsDrag] = useState(false);
+  const [isRowDrag, setIsRowDrag] = useState(false);
   const [savedXCoord, setSavedXCoord] = useState<number>();
+  const [savedYCoord, setSavedYCoord] = useState<number>();
   const [savedWidth, setSavedWidth] = useState(cellWidth);
-  const [resizeColumnIndex, setResizeColumnIndex] = useState(0);
+  const [savedHeight, setSavedHeight] = useState(cellHeight);
+  const [resizeIndex, setResizeIndex] = useState(0);
   const [showResizingLine, setShowResizingLine] = useState(false);
-  const [resizingLinePosition, setResizingLinePosition] = useState(0);
+  const [showRowResizingLine, setShowRowResizingLine] = useState(false);
+  const [resizingLinePosition, setResizingLinePosition] = useState({ x: 0, y: 0 });
 
-  // console.log('isDrag = %s, resizeColumnIndex = %d, savedXCoord = %d', isDrag, resizeColumnIndex, savedXCoord);
-
-  const bodyRef = useRef<MaybeDiv>(null);
   const containerRef = useRef<MaybeDiv>(null);
 
   const rowsNumber = 1000;
 
   const [cellsWidth, setCellsWidth] = useState(
-    Array.from({ length: bottomCellsNumber }, () => cellWidth + 1)
-  );
+    Array.from({ length: bottomCellsNumber }, () => cellWidth + 1));
 
-  const setResizingLineToCurPosition = (e: MouseEvent) => setResizingLinePosition(e.clientX - e.currentTarget.getBoundingClientRect().x);
+  const [cellsHeight, setCellsHeight] = useState(
+    Array.from({ length: rowsNumber }, () => cellHeight));
+
+  const setResizingXLineToCurPosition = (e: MouseEvent) => {
+    return setResizingLinePosition(
+      pos => ({ ...pos, x: e.clientX - e.currentTarget?.getBoundingClientRect().x }))
+  };
+
+  const setResizingYLineToCurPosition = (e: MouseEvent) => {
+    return setResizingLinePosition(
+      pos => ({ ...pos, y: e.clientY - e.currentTarget?.getBoundingClientRect().y }))
+  };
 
   const handleDrag = (e: MouseEvent, isDrag: boolean, xCoord: number) => {
     setIsDrag(isDrag);
     setSavedXCoord(xCoord);
   };
 
+  const handleRowDrag = (e: MouseEvent, isRowDrag: boolean, YCoord: number) => {
+    setIsRowDrag(isRowDrag);
+    setSavedYCoord(YCoord);
+  };
+
   const handleColumnIndex = (index: number) => {
-    setResizeColumnIndex(index)
+    setResizeIndex(index)
     setSavedWidth(cellsWidth[index])
   };
 
-  const handleColumnWidthChange = (width: number, index: number) => {
-    setCellsWidth(arr => {
+  const handleRowIndex = (index: number) => {
+    setResizeIndex(index)
+    setSavedHeight(cellsHeight[index])
+  };
+
+  const handleSizeChange = (callback: (value: React.SetStateAction<number[]>) => void, width: number, index: number) => {
+    callback(arr => {
       const resultArray = arr.slice();
       resultArray[index] = width;
       return resultArray;
     })
   }
+
+  const handleColumnWidthChange = (width: number, index: number) => handleSizeChange(setCellsWidth, width, index);
+  const handleRowHeightChange = (height: number, index: number) => handleSizeChange(setCellsHeight, height, index);
 
   const onMouseMove = (e: MouseEvent) => {
     if (isDrag && savedXCoord && savedXCoord !== e.clientX) {
@@ -203,18 +233,29 @@ export default function App() {
       if (calculatedWidth > maxCellWidth || calculatedWidth < minCellWidth) {
         return;
       }
-      setResizingLineToCurPosition(e)
+      setResizingXLineToCurPosition(e)
+    }
+    if (isRowDrag && savedYCoord && savedYCoord !== e.clientY) {
+      !showRowResizingLine && setShowRowResizingLine(true)
+      let calculatedHeight = savedHeight + e.screenY - savedYCoord;
+      if (calculatedHeight > maxCellHeight || calculatedHeight < minCellHeight) {
+        return;
+      }
+      setResizingYLineToCurPosition(e)
     }
   };
 
   const onMouseLeave = () => {
     setIsDrag(false);
     setShowResizingLine(false)
+    setShowRowResizingLine(false)
   }
 
   const disableDrag = (e: MouseEvent) => {
     setShowResizingLine(false)
+    setShowRowResizingLine(false)
     setIsDrag(false);
+    setIsRowDrag(false);
     if (savedXCoord && isDrag) {
       let calculatedWidth = savedWidth + e.screenX - savedXCoord;
       if (calculatedWidth < minCellWidth) {
@@ -223,11 +264,19 @@ export default function App() {
       if (calculatedWidth > maxCellWidth) {
         calculatedWidth = maxCellWidth;
       }
-      handleColumnWidthChange(calculatedWidth, resizeColumnIndex)
+      handleColumnWidthChange(calculatedWidth, resizeIndex)
+    }
+    if (savedYCoord && isRowDrag) {
+      let calculatedHeight = savedHeight + e.screenY - savedYCoord;
+      if (calculatedHeight < minCellHeight) {
+        calculatedHeight = minCellHeight;
+      }
+      if (calculatedHeight > maxCellHeight) {
+        calculatedHeight = maxCellHeight;
+      }
+      handleRowHeightChange(calculatedHeight, resizeIndex)
     }
   }
-
-  useEffect(() => { console.log(isDrag) }, [isDrag])
 
   const columnVirtualizer = useVirtual({
     horizontal: true,
@@ -238,7 +287,7 @@ export default function App() {
 
   const rowVirtualizer = useVirtual({
     size: rowsNumber,
-    estimateSize: useCallback(() => cellHeight, []),
+    estimateSize: useCallback((i) => cellsHeight[i], [cellsHeight]),
     parentRef: containerRef
   });
 
@@ -253,7 +302,7 @@ export default function App() {
           onMouseMove={onMouseMove}
           onMouseUp={disableDrag}
           onMouseLeave={onMouseLeave}
-          style={{ userSelect: isDrag ? 'none' : 'auto', }}
+          style={{ userSelect: (isDrag || isRowDrag) ? 'none' : 'auto', }}
         >
           <TableHeader
             headerData={headerData}
@@ -269,14 +318,18 @@ export default function App() {
                 virtualRow={virtualRow}
                 columnVirtualizer={columnVirtualizer}
                 cellsWidth={cellsWidth}
-                cellHeight={cellHeight}
                 handleDrag={handleDrag}
                 handleColumnIndex={handleColumnIndex}
+                cellHeight={cellsHeight[virtualRow.index]}
+                handleRowDrag={handleRowDrag}
+                handleRowIndex={handleRowIndex}
               />
             ))}
           </div>
         </div>
-        <ResizingLine show={showResizingLine} position={resizingLinePosition} injectedStyle={classes.resizingLine} />
+        <ResizingLine show={showResizingLine} position={resizingLinePosition.x} injectedStyle={classes.resizingLine} vertical />
+        <ResizingLine show={showRowResizingLine} position={resizingLinePosition.y} injectedStyle={classes.resizingRowLine} />
+        {/* <ResizingLine show={showResizingLine} position={resizingLinePosition.y} injectedStyle={classes.resizingLine} /> */}
       </Paper>
     </div>
   );

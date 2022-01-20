@@ -14,7 +14,6 @@ const useStyles = makeStyles({
     borderColor: 'black',
     borderStyle: "solid",
     display: 'flex',
-    justifyItems: 'space-between'
   },
   label: {
     height: "100%",
