@@ -27,7 +27,7 @@ const minCellWidth = 50;
 const maxCellWidth = 600;
 
 const cellHeight = 32;
-const minCellHeight = 50;
+const minCellHeight = 20;
 const maxCellHeight = 400;
 
 const paperPadding = 16;
@@ -116,9 +116,12 @@ const CustomCell = memo((props: CustomCellProps) => {
       rowSpan={cell.rowSpan}
     >
       <div
+        id={width.toString()}
         style={{
           width,
-          textAlign: "center"
+          textAlign: "center",
+          whiteSpace: 'nowrap',
+          textOverflow: 'ellipsis',
         }}
       >
         {cell.stringValue}
@@ -195,25 +198,28 @@ export default function App() {
       pos => ({ ...pos, y: e.clientY - e.currentTarget?.getBoundingClientRect().y }))
   };
 
-  const handleDrag = (e: MouseEvent, isDrag: boolean, xCoord: number) => {
+  const handleDrag = useCallback((e: MouseEvent, isDrag: boolean, xCoord: number) => {
     setIsDrag(isDrag);
     setSavedXCoord(xCoord);
-  };
+  }
+    , [isDrag])
 
-  const handleRowDrag = (e: MouseEvent, isRowDrag: boolean, YCoord: number) => {
+  const handleRowDrag = useCallback((e: MouseEvent, isRowDrag: boolean, YCoord: number) => {
     setIsRowDrag(isRowDrag);
     setSavedYCoord(YCoord);
-  };
+  }
+    , [isRowDrag])
 
-  const handleColumnIndex = (index: number) => {
+  const handleColumnIndex = useCallback((index: number) => {
     setResizeIndex(index)
     setSavedWidth(cellsWidth[index])
-  };
+  }, [cellsWidth])
 
-  const handleRowIndex = (index: number) => {
+  const handleRowIndex = useCallback((index: number) => {
     setResizeIndex(index)
     setSavedHeight(cellsHeight[index])
-  };
+  }
+    , [cellsHeight])
 
   const handleSizeChange = (callback: (value: React.SetStateAction<number[]>) => void, width: number, index: number) => {
     callback(arr => {
@@ -282,13 +288,15 @@ export default function App() {
     horizontal: true,
     size: bottomCellsNumber,
     estimateSize: useCallback((i) => cellsWidth[i], [cellsWidth]),
-    parentRef: containerRef
+    parentRef: containerRef,
+    overscan: 2,
   });
 
   const rowVirtualizer = useVirtual({
     size: rowsNumber,
     estimateSize: useCallback((i) => cellsHeight[i], [cellsHeight]),
-    parentRef: containerRef
+    parentRef: containerRef,
+    overscan: 2,
   });
 
   const classes = useStyles();
@@ -312,19 +320,25 @@ export default function App() {
             className={classes.bodyContainer}
             style={{ height: rowVirtualizer.totalSize, width: columnVirtualizer.totalSize }}
           >
-            {rowVirtualizer.virtualItems.map((virtualRow, i) => (
-              <CustomRow
-                key={virtualRow.index}
-                virtualRow={virtualRow}
-                columnVirtualizer={columnVirtualizer}
-                cellsWidth={cellsWidth}
-                handleDrag={handleDrag}
-                handleColumnIndex={handleColumnIndex}
-                cellHeight={cellsHeight[virtualRow.index]}
-                handleRowDrag={handleRowDrag}
-                handleRowIndex={handleRowIndex}
-              />
-            ))}
+            <div style={{
+              position: "absolute",
+              transform: `translateY(${rowVirtualizer.virtualItems[0].start}px)`,
+              width: '100%',
+            }}>
+              {rowVirtualizer.virtualItems.map((virtualRow, i) => (
+                <CustomRow
+                  key={virtualRow.index}
+                  virtualRowIndex={virtualRow.index}
+                  columnVirtualizer={columnVirtualizer}
+                  cellsWidth={cellsWidth}
+                  handleDrag={handleDrag}
+                  handleColumnIndex={handleColumnIndex}
+                  cellHeight={cellsHeight[virtualRow.index]}
+                  handleRowDrag={handleRowDrag}
+                  handleRowIndex={handleRowIndex}
+                />
+              ))}
+            </div>
           </div>
         </div>
         <ResizingLine show={showResizingLine} position={resizingLinePosition.x} injectedStyle={classes.resizingLine} vertical />

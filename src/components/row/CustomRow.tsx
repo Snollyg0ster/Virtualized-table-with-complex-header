@@ -8,16 +8,29 @@ import BodyCell from "../cell";
 const dragAreaHeight = 4;
 
 const useStyles = makeStyles({
-  resize: {
+  resizeTop: {
+    position: "relative",
+    height: dragAreaHeight,
+    marginBottom: -dragAreaHeight,
+    cursor: 'row-resize',
+    zIndex: 2,
+  },
+  resizeBottom: {
     position: "relative",
     height: dragAreaHeight,
     cursor: 'row-resize',
     zIndex: 2,
   },
+  row: {
+    zIndex: 0,
+    display: 'flex',
+    position: "absolute",
+    height: '100%'
+  }
 });
 
 interface CustomRowProps {
-  virtualRow: VirtualItem;
+  virtualRowIndex: number;
   columnVirtualizer: ColumnVirtualizer;
   cellsWidth: number[];
   cellHeight: number;
@@ -28,7 +41,7 @@ interface CustomRowProps {
 }
 
 const CustomRow = memo((props: CustomRowProps) => {
-  const { virtualRow, cellsWidth, columnVirtualizer, handleColumnIndex,
+  const { virtualRowIndex, cellsWidth, columnVirtualizer, handleColumnIndex,
     handleDrag, cellHeight, handleRowIndex, handleRowDrag } = props;
 
   const onMouseDown = (e: MouseEvent, index: number) => {
@@ -40,29 +53,31 @@ const CustomRow = memo((props: CustomRowProps) => {
 
   return (
     <div
-      key={`${virtualRow.index}`}
+      key={`${virtualRowIndex}`}
       style={{
-        position: "absolute",
-        width: `${columnVirtualizer.totalSize}px`,
+        position: 'relative',
         height: cellHeight,
-        transform: `translateY(${virtualRow.start}px)`
+        transform: `translateX(${columnVirtualizer.virtualItems[0].start}px)`,
       }}
     >
-      <div className={classes.resize} onMouseDown={(e) => onMouseDown(e, virtualRow.index - 1)} />
-      <div style={{ zIndex: 0 }}>{columnVirtualizer.virtualItems.map((virtualColumn) => (
-        <BodyCell
-          key={virtualColumn.index}
-          rowIndex={virtualRow.index}
-          cellWidth={cellsWidth[virtualColumn.index]}
-          virtualColumn={virtualColumn}
-          handleDrag={handleDrag}
-          handleColumnIndex={handleColumnIndex}
-        />
-      ))}</div>
+      <div className={classes.resizeTop} onMouseDown={(e) => onMouseDown(e, virtualRowIndex - 1)} />
       <div
-        style={{ marginTop: cellHeight - dragAreaHeight * 2 }}
-        className={classes.resize}
-        onMouseDown={(e) => onMouseDown(e, virtualRow.index)} />
+        className={classes.row}
+      >
+        {columnVirtualizer.virtualItems.map((virtualColumn) => (
+          <BodyCell
+            key={virtualColumn.index}
+            rowIndex={virtualRowIndex}
+            cellWidth={cellsWidth[virtualColumn.index]}
+            columnIndex={virtualColumn.index}
+            handleDrag={handleDrag}
+            handleColumnIndex={handleColumnIndex}
+          />
+        ))}</div>
+      <div
+        style={{ marginTop: cellHeight - dragAreaHeight }}
+        className={classes.resizeBottom}
+        onMouseDown={(e) => onMouseDown(e, virtualRowIndex)} />
     </div>
   )
 }, (a, b) => compareExcept(a, b, 'handleDrag', 'handleColumnIndex',

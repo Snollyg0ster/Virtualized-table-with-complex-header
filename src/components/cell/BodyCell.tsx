@@ -5,9 +5,6 @@ import { compareExcept } from "../../utils";
 
 const useStyles = makeStyles({
   bodyCell: {
-    position: "absolute",
-    top: 0,
-    left: 0,
     height: "100%",
     boxSizing: "border-box",
     borderWidth: '1px 0 0 1px',
@@ -15,9 +12,22 @@ const useStyles = makeStyles({
     borderStyle: "solid",
     display: 'flex',
   },
-  label: {
+  labelCont: {
     height: "100%",
     width: "100%",
+    textAlign: "center",
+    verticalAlign: 'middle',
+    position: "relative",
+  },
+  label: {
+    position: "absolute",
+    left: '50%',
+    top: '50%',
+    transform: "translate(-50%, -50%)",
+    maxHeight: "100%",
+    width: "100%",
+    textAlign: "center",
+    textOverflow: 'ellipsis',
   },
   resizeFromStart: {
     height: "100%",
@@ -35,7 +45,7 @@ const useStyles = makeStyles({
 });
 
 interface BodyCellProps {
-  virtualColumn: VirtualItem;
+  columnIndex: number;
   cellWidth: number;
   rowIndex: number;
   handleColumnIndex: (index: number) => void;
@@ -43,30 +53,29 @@ interface BodyCellProps {
 }
 
 const BodyCell = memo((props: BodyCellProps) => {
-  const { virtualColumn, cellWidth, rowIndex, handleColumnIndex, handleDrag } = props;
+  const { columnIndex, cellWidth, rowIndex, handleColumnIndex, handleDrag } = props;
 
   const onMouseDown = (e: MouseEvent, index: number) => {
     handleDrag(e, true, e.screenX);
     handleColumnIndex(index)
   };
-
   const classes = useStyles();
 
   return (
     <div
-      key={virtualColumn.index}
-      ref={virtualColumn.measureRef}
+      key={columnIndex}
       className={classes.bodyCell}
       style={{
         width: cellWidth,
-        transform: `translateX(${virtualColumn.start}px)`
       }}
     >
-      <div className={classes.resizeFromStart} onMouseDown={(e) => onMouseDown(e, virtualColumn.index - 1)} />
-      <div className={classes.label}>{`${rowIndex} ${virtualColumn.index}`}</div>
-      <div className={classes.resizeFromEnd} onMouseDown={(e) => onMouseDown(e, virtualColumn.index)} />
+      <div className={classes.resizeFromStart} onMouseDown={(e) => onMouseDown(e, columnIndex - 1)} />
+      <div className={classes.labelCont}>
+        <div className={classes.label}>{`${rowIndex} ${columnIndex}`}</div>
+      </div>
+      <div className={classes.resizeFromEnd} onMouseDown={(e) => onMouseDown(e, columnIndex)} />
     </div>
   )
-}, (a, b) => compareExcept(a, b, 'handleDrag', 'handleColumnIndex'));
+}, (a, b) => compareExcept(a, b, 'handleDrag',));
 
 export default BodyCell;
